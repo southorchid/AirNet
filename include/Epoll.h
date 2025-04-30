@@ -5,19 +5,23 @@
 
 #include <vector>
 
+#include "Channel.h"
 #include "Log.h"
 
+class Channel;
 class Epoll {
  public:
   Epoll();
 
-  std::vector<int> wait(int timeout = -1);
+  std::vector<Channel *> wait(int timeout = -1);
 
-  void add(int fd) const;
+  void update(Channel *ch);
 
-  void mod(int fd) const;
+  void add(Channel *ch) const;
 
-  void del(int fd) const;
+  void mod(Channel *ch) const;
+
+  void del(Channel *ch) const;
 
  private:
   static constexpr int EVENTS_MAX_SIZE = 1024;
