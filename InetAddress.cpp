@@ -1,9 +1,8 @@
 #include "InetAddress.h"
 
-InetAddress::InetAddress() { memset(&address_, 0, sizeof(address_)); }
+InetAddress::InetAddress() : address_({}) {}
 
-InetAddress::InetAddress(const std::string& host, int port) {
-  memset(&address_, 0, sizeof(address_));
+InetAddress::InetAddress(const std::string& host, int port) : address_({}) {
   address_.sin_family = AF_INET;
   address_.sin_addr.s_addr = inet_addr(host.c_str());
   address_.sin_port = htons(port);
