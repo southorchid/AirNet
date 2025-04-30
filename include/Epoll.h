@@ -17,11 +17,12 @@ class Epoll {
 
   void update(Channel *ch);
 
+  void del(int fd) const;
+
+ private:
   void add(Channel *ch) const;
 
   void mod(Channel *ch) const;
-
-  void del(Channel *ch) const;
 
  private:
   static constexpr int EVENTS_MAX_SIZE = 1024;

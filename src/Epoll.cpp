@@ -38,6 +38,12 @@ void Epoll::update(Channel *ch) {
   }
 }
 
+void Epoll::del(int fd) const {
+  if (epoll_ctl(epfd_, EPOLL_CTL_DEL, fd, nullptr) == -1) {
+    Log::error("Epoll ctl del {} failed: {}", fd, strerror(errno));
+  }
+}
+
 void Epoll::add(Channel *ch) const {
   int fd = ch->fd();
   if (fd == -1) {
@@ -60,12 +66,5 @@ void Epoll::mod(Channel *ch) const {
   ev.events = ch->events();
   if (epoll_ctl(epfd_, EPOLL_CTL_ADD, fd, &ev) == -1) {
     Log::error("Epoll ctl add {} failed: {}", fd, strerror(errno));
-  }
-}
-
-void Epoll::del(Channel *ch) const {
-  int fd = ch->fd();
-  if (epoll_ctl(epfd_, EPOLL_CTL_DEL, fd, nullptr) == -1) {
-    Log::error("Epoll ctl del {} failed: {}", fd, strerror(errno));
   }
 }
