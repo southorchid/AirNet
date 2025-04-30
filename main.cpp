@@ -7,18 +7,24 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+#include <unordered_map>
 
 #include "Acceptor.h"
 #include "Channel.h"
+#include "Connection.h"
 #include "Epoll.h"
 #include "InetAddress.h"
 #include "Socket.h"
 
 Epoll epoll;
 
+std::unordered_map<int, std::unique_ptr<Connection>> connections;
+
 void newconnect(int fd, std::unique_ptr<InetAddress> address);
 
-void onconnect(int fd);
+void disconnect(int fd);
+
+void onconnect(Connection *conn);
 
 const int BUFFER_MAX_SIZE = 1024;
 
@@ -34,23 +40,25 @@ int main() {
       int fd = ch->fd();
       uint32_t reevents = ch->reevents();
       if (reevents & EPOLLERR) {
-        std::cout << "Client " << fd << " error" << std::endl;
-        epoll.del(fd);
-        close(fd);
+        ch->handle_disconnect();
+        break;
       }
       if (reevents & EPOLLHUP) {
-        std::cout << "Client " << fd << " disconnected" << std::endl;
-        epoll.del(fd);
-        close(fd);
+        ch->handle_disconnect();
+        break;
       }
       if (reevents & EPOLLPRI) {
+        ch->handle_read_event();
       }
       if (reevents & EPOLLIN) {
         ch->handle_read_event();
       }
       if (reevents & EPOLLOUT) {
+        ch->handle_write_event();
       }
       if (reevents & EPOLLRDHUP) {
+        ch->handle_disconnect();
+        break;
       }
     }
   }
@@ -59,37 +67,32 @@ int main() {
 }
 
 void newconnect(int fd, std::unique_ptr<InetAddress> address) {
-  Socket *client_sock = new Socket(fd);
-  Channel *client_chan = new Channel(&epoll, fd);
-  client_chan->handle_read_event_function([fd]() { onconnect(fd); });
-  client_chan->enable_read();
   Log::info("Client {} connected from {}:{}", fd, address->host(),
             address->port());
+  std::unique_ptr<Connection> conn =
+      std::make_unique<Connection>(&epoll, fd, std::move(address));
+  conn->handle_onconnect_function(std::bind(onconnect, std::placeholders::_1));
+  conn->handle_disconnect_function([fd]() { disconnect(fd); });
+  connections.insert(std::make_pair(fd, std::move(conn)));
 }
 
-void onconnect(int fd) {
-  char read_buffer[BUFFER_MAX_SIZE];
-  memset(read_buffer, 0, sizeof(read_buffer));
-  int read_bytes = read(fd, read_buffer, BUFFER_MAX_SIZE);
-  if (read_bytes <= 0) {
-    std::cout << "Client " << fd << " disconected" << std::endl;
-    epoll.del(fd);
-    close(fd);
-  } else {
-    std::cout << "Received:\n" << read_buffer << std::endl;
-    std::string write_buffer =
-        "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/plain\r\n"
-        "Content-Length: 2\r\n"
-        "\r\n"
-        "OK";
-    int write_bytes = write(fd, write_buffer.c_str(), write_buffer.size());
-    if (write_bytes == -1) {
-      perror("Socket write failed");
-      epoll.del(fd);
-      close(fd);
-    } else {
-      std::cout << "Send:\n" << write_buffer << std::endl;
-    }
+void disconnect(int fd) {
+  auto it = connections.find(fd);
+  if (it == connections.end()) {
+    return;
   }
+  epoll.del(fd);
+  connections.erase(fd);
+  Log::info("Client {} disconnected", fd);
+}
+
+void onconnect(Connection *conn) {
+  std::cout << "Recevied:\n" << conn->read().data() << std::endl;
+  std::string write_buffer =
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Type: text/plain\r\n"
+      "Content-Length: 2\r\n"
+      "\r\n"
+      "OK";
+  conn->write(std::vector<char>(write_buffer.begin(), write_buffer.end()));
 }

@@ -4,10 +4,26 @@ Channel::Channel(Epoll* epoll, int fd)
     : epoll_(epoll), inepoll_(false), fd_(fd), events_(0), reevents_(0) {}
 
 void Channel::handle_read_event() {
-  if (handle_read_event_function_) {
-    handle_read_event_function_();
+  if (read_event_callback_) {
+    read_event_callback_();
   } else {
     Log::warn("Channel {} not set handle read event function", fd_);
+  }
+}
+
+void Channel::handle_write_event() {
+  if (write_event_callback_) {
+    write_event_callback_();
+  } else {
+    Log::warn("Channel {} not set handle write event function", fd_);
+  }
+}
+
+void Channel::handle_disconnect() {
+  if (disconnect_callback_) {
+    disconnect_callback_();
+  } else {
+    Log::warn("Channel {} not set handle disconnect function", fd_);
   }
 }
 
@@ -16,6 +32,29 @@ void Channel::enable_read() {
     return;
   }
   events_ |= EPOLLIN;
+  epoll_->update(this);
+}
+
+void Channel::enable_write() {
+  if (events_ & EPOLLOUT) {
+    return;
+  }
+  events_ |= EPOLLOUT;
+  epoll_->update(this);
+}
+
+void Channel::disable_write() {
+  if (events_ & EPOLLOUT) {
+    events_ &= ~EPOLLOUT;
+    epoll_->update(this);
+  }
+}
+
+void Channel::useET() {
+  if (events_ & EPOLLET) {
+    return;
+  }
+  events_ |= EPOLLET;
   epoll_->update(this);
 }
 
@@ -31,6 +70,14 @@ uint32_t Channel::reevents() const { return reevents_; }
 
 void Channel::reevents(uint32_t ev) { reevents_ = ev; }
 
-void Channel::handle_read_event_function(std::function<void()> function) {
-  handle_read_event_function_ = function;
+void Channel::read_event_callback(std::function<void()> function) {
+  read_event_callback_ = function;
+}
+
+void Channel::write_event_callback(std::function<void()> function) {
+  write_event_callback_ = function;
+}
+
+void Channel::disconnect_callback(std::function<void()> function) {
+  disconnect_callback_ = function;
 }

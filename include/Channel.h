@@ -11,7 +11,17 @@ class Channel {
 
   void handle_read_event();
 
+  void handle_write_event();
+
+  void handle_disconnect();
+
   void enable_read();
+
+  void enable_write();
+
+  void disable_write();
+
+  void useET();
 
   bool inepoll() const;
   void atepoll();
@@ -23,7 +33,11 @@ class Channel {
   uint32_t reevents() const;
   void reevents(uint32_t ev);
 
-  void handle_read_event_function(std::function<void()> function);
+  void read_event_callback(std::function<void()> function);
+
+  void write_event_callback(std::function<void()> function);
+
+  void disconnect_callback(std::function<void()> function);
 
  private:
   Epoll *epoll_;
@@ -31,5 +45,7 @@ class Channel {
   int fd_;
   uint32_t events_;
   uint32_t reevents_;
-  std::function<void()> handle_read_event_function_;
+  std::function<void()> read_event_callback_;
+  std::function<void()> write_event_callback_;
+  std::function<void()> disconnect_callback_;
 };

@@ -64,7 +64,7 @@ void Epoll::mod(Channel *ch) const {
   epoll_event ev;
   ev.data.ptr = ch;
   ev.events = ch->events();
-  if (epoll_ctl(epfd_, EPOLL_CTL_ADD, fd, &ev) == -1) {
-    Log::error("Epoll ctl add {} failed: {}", fd, strerror(errno));
+  if (epoll_ctl(epfd_, EPOLL_CTL_MOD, fd, &ev) == -1) {
+    Log::error("Epoll ctl mod {} failed: {}", fd, strerror(errno));
   }
 }
