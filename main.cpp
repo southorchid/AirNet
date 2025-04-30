@@ -6,6 +6,8 @@
 #include <cstring>
 #include <iostream>
 
+#include "InetAddress.h"
+
 const int BUFFER_MAX_SIZE = 1024;
 
 int main() {
@@ -15,14 +17,9 @@ int main() {
     throw std::runtime_error("Socket create failed");
   }
 
-  struct sockaddr_in server_addr;
-  memset(&server_addr, 0, sizeof(server_addr));
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(8080);
+  InetAddress server_addr("0.0.0.0", 8080);
 
-  if (bind(serverfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) ==
-      -1) {
+  if (bind(serverfd, server_addr.addr(), server_addr.len()) == -1) {
     perror("Socket bind failed");
     throw std::runtime_error("Socket bind failed");
   }
@@ -32,18 +29,14 @@ int main() {
     throw std::runtime_error("Socket listen failed");
   }
 
-  struct sockaddr_in client_addr;
-  socklen_t client_addr_len = sizeof(client_addr);
-  memset(&client_addr, 0, client_addr_len);
-
-  int clientfd =
-      accept(serverfd, (struct sockaddr *)&client_addr, &client_addr_len);
+  InetAddress client_addr;
+  socklen_t client_addr_len = client_addr.len();
+  int clientfd = accept(serverfd, client_addr.addr(), &client_addr_len);
   if (clientfd == -1) {
     perror("Socket accept failed");
   } else {
     std::cout << "Client " << clientfd << " connected from "
-              << inet_ntoa(client_addr.sin_addr) << ":"
-              << htons(client_addr.sin_port) << std::endl;
+              << client_addr.host() << ":" << client_addr.port() << std::endl;
   }
 
   char read_buffer[BUFFER_MAX_SIZE];
