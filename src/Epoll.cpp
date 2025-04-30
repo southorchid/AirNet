@@ -8,7 +8,7 @@ Epoll::Epoll() : epfd_(-1), events_{} {
   }
 }
 
-std::vector<int> Epoll::wait(int timeout) {
+std::vector<Channel *> Epoll::wait(int timeout) {
   int infds = epoll_wait(epfd_, events_, EVENTS_MAX_SIZE, timeout);
   if (infds == -1) {
     // 发生错误
@@ -19,33 +19,52 @@ std::vector<int> Epoll::wait(int timeout) {
     // 超时
     return {};
   }
-  std::vector<int> fds;
-  fds.reserve(infds);
+  std::vector<Channel *> active_channels;
+  active_channels.reserve(infds);
   for (int i = 0; i < infds; ++i) {
-    fds.push_back(events_[i].data.fd);
+    Channel *ch = (Channel *)events_[i].data.ptr;
+    ch->reevents(events_[i].events);
+    active_channels.emplace_back(ch);
   }
-  return fds;
+  return active_channels;
 }
 
-void Epoll::add(int fd) const {
+void Epoll::update(Channel *ch) {
+  if (ch->inepoll()) {
+    // Channel已经在epoll红黑树上
+    this->mod(ch);
+  } else {
+    this->add(ch);
+  }
+}
+
+void Epoll::add(Channel *ch) const {
+  int fd = ch->fd();
+  if (fd == -1) {
+    Log::error("Bad file descriptor {}", fd);
+    return;
+  }
   epoll_event ev;
-  ev.data.fd = fd;
-  ev.events = EPOLLIN;
+  ev.data.ptr = ch;
+  ev.events = ch->events();
+  if (epoll_ctl(epfd_, EPOLL_CTL_ADD, fd, &ev) == -1) {
+    Log::error("Epoll ctl add {} failed: {}", fd, strerror(errno));
+  }
+  ch->atepoll();
+}
+
+void Epoll::mod(Channel *ch) const {
+  int fd = ch->fd();
+  epoll_event ev;
+  ev.data.ptr = ch;
+  ev.events = ch->events();
   if (epoll_ctl(epfd_, EPOLL_CTL_ADD, fd, &ev) == -1) {
     Log::error("Epoll ctl add {} failed: {}", fd, strerror(errno));
   }
 }
 
-void Epoll::mod(int fd) const {
-  epoll_event ev;
-  ev.data.fd = fd;
-  ev.events = EPOLLIN;
-  if (epoll_ctl(epfd_, EPOLL_CTL_ADD, fd, &ev) == -1) {
-    Log::error("Epoll ctl add {} failed: {}", fd, strerror(errno));
-  }
-}
-
-void Epoll::del(int fd) const {
+void Epoll::del(Channel *ch) const {
+  int fd = ch->fd();
   if (epoll_ctl(epfd_, EPOLL_CTL_DEL, fd, nullptr) == -1) {
     Log::error("Epoll ctl del {} failed: {}", fd, strerror(errno));
   }
