@@ -5,7 +5,8 @@ Acceptor::Acceptor(Epoll* epoll)
       socket_(std::make_unique<Socket>()),
       address_(nullptr),
       channel_(std::make_unique<Channel>(epoll, socket_->fd())) {
-  channel_->handle_read_event_function([this]() { this->accept(); });
+  socket_->reuse();
+  channel_->read_event_callback([this]() { this->accept(); });
   channel_->enable_read();
 }
 
