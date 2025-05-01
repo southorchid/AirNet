@@ -1,10 +1,10 @@
 #include "Connection.h"
 
-Connection::Connection(Epoll* epoll, int fd,
+Connection::Connection(EventLoop* loop, int fd,
                        std::unique_ptr<InetAddress> address)
-    : epoll_(epoll),
+    : loop_(loop),
       socket_(std::make_unique<Socket>(fd)),
-      channel_(std::make_unique<Channel>(epoll, fd)),
+      channel_(std::make_unique<Channel>(loop, fd)),
       address_(std::move(address)),
       read_buffer_(std::make_unique<Buffer>()),
       write_buffer_(std::make_unique<Buffer>()),
@@ -12,14 +12,27 @@ Connection::Connection(Epoll* epoll, int fd,
   socket_->nonblock();
   channel_->enable_read();
   channel_->useET();
-  channel_->read_event_callback(
-      [this]() { this->handle_onconnect_functioon_(this); });
-  channel_->write_event_callback([this]() { this->write(); });
-  channel_->disconnect_callback(
-      [this]() { this->handle_disconnect_function_(); });
+  channel_->read_event_callback([this]() {
+    if (state_ == READCLOSE || state_ == DISCONNECT) {
+      return;
+    }
+    this->onconect_callback_(shared_from_this());
+  });
+  channel_->write_event_callback([this]() {
+    if (state_ == WRITECLOSE || state_ == DISCONNECT) {
+      return;
+    }
+    this->write();
+    if (state_ == DISCONNECT) {
+    }
+  });
+  channel_->disconnect_callback([this]() { this->disconnect_callback_(); });
+
+  channel_->close_read_callback([this]() { this->close_read(); });
+  channel_->close_write_callback([this]() { this->close_write(); });
 }
 
-const std::vector<char>& Connection::read() {
+void Connection::read() {
   read_buffer_->clear();
   std::vector<char> buffer(DATA_MAX_SIZE);
   while (true) {
@@ -29,8 +42,8 @@ const std::vector<char>& Connection::read() {
       // 读取到数据，追加到读缓冲区
       read_buffer_->append(buffer, read_bytes);
     } else if (read_bytes == 0) {
-      // 客户端断开连接
-      state_ = DISCONNECT;
+      // 客户端断开写端
+      channel_->close_read();
       break;
     } else if (read_bytes == -1 && errno == EINTR) {
       // 信号中断，继续读取
@@ -39,25 +52,21 @@ const std::vector<char>& Connection::read() {
       // 非阻塞I/O下没有数据可读
       break;
     } else if (read_bytes == -1) {
-      // 发生错误，做断开连接处理
+      // 发生错误，断开连接
       Log::error("Connection {} read error: {}", socket_->fd(),
                  strerror(errno));
       state_ = DISCONNECT;
+      channel_->close();
       break;
     } else {
-      // 未知异常，做断开连接处理
+      // 未知异常，断开连接
       Log::error("Connection {} read unknown error: {}", socket_->fd(),
                  strerror(errno));
       state_ = DISCONNECT;
+      channel_->close();
       break;
     }
   }
-  return read_buffer_->buffer();
-}
-
-void Connection::write(std::vector<char> data) {
-  this->append(data);
-  write();
 }
 
 void Connection::write() {
@@ -79,7 +88,7 @@ void Connection::write() {
       left_bytes -= write_bytes;
     } else if (write_bytes == 0) {
       // 客户端断开连接
-      state_ = DISCONNECT;
+      channel_->close_write();
       break;
     } else if (write_bytes == -1 && errno == EINTR) {
       // 信号中断，继续写
@@ -89,17 +98,22 @@ void Connection::write() {
       write_buffer_->erase(data_bytes - left_bytes);  // 清除已经写的数据
       channel_->enable_write();  // 开启监视写事件，等待下次写
       break;
+    } else if (write_bytes == -1 && errno == EPIPE) {
+      channel_->close_write();
+      break;
     } else if (write_bytes == -1) {
       // 发送错误，断开连接
       Log::error("Connection {} write error: {}", socket_->fd(),
                  strerror(errno));
       state_ = DISCONNECT;
+      channel_->close();
       break;
     } else {
       // 未知错误
       Log::error("Connection {} write unknown error: {}", socket_->fd(),
                  strerror(errno));
       state_ = DISCONNECT;
+      channel_->close();
       break;
     }
   }
@@ -110,21 +124,50 @@ void Connection::write() {
   }
 }
 
-const std::vector<char> Connection::read_buffer() const {
-  return read_buffer_->buffer();
+void Connection::close_read() {
+  // 读端已经关闭或连接已断开则不需要关闭读端
+  if (state_ != READCLOSE && state_ != DISCONNECT) {
+    if (shutdown(socket_->fd(), SHUT_RD) == -1) {
+      Log::warn("Connection {} shutdown read failed: {}", socket_->fd(),
+                strerror(errno));
+      return;
+    }
+    channel_->disable_read();
+  }
+  if (state_ == CONNECT) {
+    // 原来的状态是正常连接则将状态更新为读端关闭
+    state_ = READCLOSE;
+  } else if (state_ == WRITECLOSE) {
+    // 原来的状态是写端关闭则将状态更新为连接断开
+    state_ = DISCONNECT;
+  }
 }
 
-void Connection::append(std::vector<char> data) {
-  write_buffer_->append(data, data.size());
+void Connection::close_write() {
+  if (state_ == WRITECLOSE || state_ == DISCONNECT) {
+    return;
+  }
+  if (shutdown(socket_->fd(), SHUT_WR) == -1) {
+    Log::warn("Connection {} shutdown write failed: {}", socket_->fd(),
+              strerror(errno));
+  }
+  channel_->disable_write();
+  if (state_ == CONNECT) {
+    state_ = WRITECLOSE;
+  } else if (state_ == READCLOSE) {
+    state_ = DISCONNECT;
+  }
 }
+
+const Buffer& Connection::read_buffer() const { return *read_buffer_; }
 
 Connection::STATE Connection::state() { return state_; }
 
-void Connection::handle_onconnect_function(
-    std::function<void(Connection*)> function) {
-  handle_onconnect_functioon_ = function;
+void Connection::onconect_callback(
+    std::function<void(std::shared_ptr<Connection>)> func) {
+  onconect_callback_ = func;
 }
 
-void Connection::handle_disconnect_function(std::function<void()> function) {
-  handle_disconnect_function_ = function;
+void Connection::disconnect_callback(std::function<void()> function) {
+  disconnect_callback_ = function;
 }

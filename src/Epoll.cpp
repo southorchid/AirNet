@@ -30,7 +30,7 @@ std::vector<Channel *> Epoll::wait(int timeout) {
 }
 
 void Epoll::update(Channel *ch) {
-  if (ch->inepoll()) {
+  if (ch->is_inepoll()) {
     // Channel已经在epoll红黑树上
     this->mod(ch);
   } else {
@@ -56,7 +56,7 @@ void Epoll::add(Channel *ch) const {
   if (epoll_ctl(epfd_, EPOLL_CTL_ADD, fd, &ev) == -1) {
     Log::error("Epoll ctl add {} failed: {}", fd, strerror(errno));
   }
-  ch->atepoll();
+  ch->inepoll();
 }
 
 void Epoll::mod(Channel *ch) const {

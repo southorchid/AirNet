@@ -1,10 +1,10 @@
 #include "Acceptor.h"
 
-Acceptor::Acceptor(Epoll* epoll)
-    : epoll_(epoll),
+Acceptor::Acceptor(EventLoop* loop)
+    : loop_(loop),
       socket_(std::make_unique<Socket>()),
       address_(nullptr),
-      channel_(std::make_unique<Channel>(epoll, socket_->fd())) {
+      channel_(std::make_unique<Channel>(loop, socket_->fd())) {
   socket_->reuse();
   channel_->read_event_callback([this]() { this->accept(); });
   channel_->enable_read();
@@ -38,15 +38,15 @@ void Acceptor::accept() {
     Log::error("Acceptor accept failed: {}", strerror(errno));
     return;
   }
-  if (handle_newconnect_function_) {
-    handle_newconnect_function_(clientfd, std::move(client_addr));
+  if (newconnect_callback_) {
+    newconnect_callback_(clientfd, std::move(client_addr));
   } else {
     Log::fatal("Acceptor not set handle new connection function");
     throw std::runtime_error("Acceptor not set handle new connect function");
   }
 }
 
-void Acceptor::handle_newconnect_function(
-    std::function<void(int, std::unique_ptr<InetAddress>)> function) {
-  handle_newconnect_function_ = function;
+void Acceptor::newconnect_callback(
+    std::function<void(int, std::unique_ptr<InetAddress>)> func) {
+  newconnect_callback_ = func;
 }
