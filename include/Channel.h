@@ -7,7 +7,7 @@
 class EventLoop;
 class Channel {
  public:
-  Channel(EventLoop *loop, int fd);
+  Channel(std::shared_ptr<EventLoop> loop, int fd);
 
   void handle_read_event();
 
@@ -53,7 +53,7 @@ class Channel {
   void close_write_callback(std::function<void()> func);
 
  private:
-  EventLoop *loop_;
+  std::shared_ptr<EventLoop> loop_;
   bool inepoll_;
   int fd_;
   uint32_t events_;

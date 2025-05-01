@@ -1,6 +1,6 @@
 #include "Channel.h"
 
-Channel::Channel(EventLoop *loop, int fd)
+Channel::Channel(std::shared_ptr<EventLoop> loop, int fd)
     : loop_(loop),
       inepoll_(false),
       fd_(fd),
@@ -26,6 +26,7 @@ void Channel::handle_write_event() {
 
 void Channel::handle_disconnect() {
   if (disconnect_callback_) {
+    loop_->del(fd_);
     disconnect_callback_();
   } else {
     Log::warn("Channel {} not set handle disconnect function", fd_);

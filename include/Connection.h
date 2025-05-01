@@ -12,7 +12,8 @@
 class Connection : public std::enable_shared_from_this<Connection> {
  public:
   enum STATE { CONNECT = 0, READCLOSE, WRITECLOSE, DISCONNECT };
-  Connection(EventLoop *loop, int fd, std::unique_ptr<InetAddress> address);
+  Connection(std::shared_ptr<EventLoop> loop, int fd,
+             std::unique_ptr<InetAddress> address);
 
   void read();
 
@@ -35,7 +36,7 @@ class Connection : public std::enable_shared_from_this<Connection> {
 
  private:
   static const int DATA_MAX_SIZE = 1024;
-  EventLoop *loop_;
+  std::shared_ptr<EventLoop> loop_;
   std::unique_ptr<Socket> socket_;
   std::unique_ptr<Channel> channel_;
   std::unique_ptr<InetAddress> address_;

@@ -11,7 +11,7 @@
 
 class Acceptor {
  public:
-  Acceptor(EventLoop *loop);
+  Acceptor(std::shared_ptr<EventLoop> loop);
 
   void bind(const std::string &host, int port);
 
@@ -23,7 +23,7 @@ class Acceptor {
       std::function<void(int, std::unique_ptr<InetAddress>)> func);
 
  private:
-  EventLoop *loop_;
+  std::shared_ptr<EventLoop> loop_;
   std::unique_ptr<Socket> socket_;
   std::unique_ptr<Channel> channel_;
   std::unique_ptr<InetAddress> address_;

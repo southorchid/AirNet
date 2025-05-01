@@ -1,6 +1,6 @@
 #include "Connection.h"
 
-Connection::Connection(EventLoop* loop, int fd,
+Connection::Connection(std::shared_ptr<EventLoop> loop, int fd,
                        std::unique_ptr<InetAddress> address)
     : loop_(loop),
       socket_(std::make_unique<Socket>(fd)),

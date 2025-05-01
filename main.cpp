@@ -20,7 +20,9 @@
 void onconnect(std::shared_ptr<Connection> conn);
 
 int main() {
-  Server::instance("0.0.0.0", 8080, onconnect).run();
+  Server server("0.0.0.0", 8080, 1);
+  server.onconnect_callback(onconnect);
+  server.run();
 
   return 0;
 }
