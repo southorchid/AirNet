@@ -23,8 +23,6 @@ Connection::Connection(std::shared_ptr<EventLoop> loop, int fd,
       return;
     }
     this->write();
-    if (state_ == DISCONNECT) {
-    }
   });
   channel_->disconnect_callback([this]() { this->disconnect_callback_(); });
 
@@ -43,6 +41,7 @@ void Connection::read() {
       read_buffer_->append(buffer, read_bytes);
     } else if (read_bytes == 0) {
       // 客户端断开写端
+      Log::info("Connection {} read 0 bytes, close read!", socket_->fd());
       channel_->close_read();
       break;
     } else if (read_bytes == -1 && errno == EINTR) {
@@ -140,6 +139,7 @@ void Connection::close_read() {
   } else if (state_ == WRITECLOSE) {
     // 原来的状态是写端关闭则将状态更新为连接断开
     state_ = DISCONNECT;
+    channel_->close();
   }
 }
 
@@ -156,6 +156,7 @@ void Connection::close_write() {
     state_ = WRITECLOSE;
   } else if (state_ == READCLOSE) {
     state_ = DISCONNECT;
+    channel_->close();
   }
 }
 

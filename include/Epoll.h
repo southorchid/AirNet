@@ -6,20 +6,23 @@
 #include <vector>
 
 #include "Channel.h"
+#include "Driver.h"
 #include "Log.h"
 
 class Channel;
-class Epoll {
+class Epoll : public Driver {
  public:
   Epoll();
 
-  std::vector<Channel *> wait(int timeout = -1);
+  void multiplexing(int timeout = -1) override;
 
-  void update(Channel *ch);
+  void update(Channel *ch) override;
 
-  void del(int fd) const;
+  void del(int fd) override;
 
  private:
+  std::vector<Channel *> wait(int timeout = -1);
+
   void add(Channel *ch) const;
 
   void mod(Channel *ch) const;

@@ -2,7 +2,9 @@
 
 Channel::Channel(std::shared_ptr<EventLoop> loop, int fd)
     : loop_(loop),
-      inepoll_(false),
+      inloop_(false),
+      enread_(false),
+      enwrite_(false),
       fd_(fd),
       events_(0),
       reevents_(0),
@@ -38,12 +40,17 @@ void Channel::enable_read() {
     return;
   }
   events_ |= EPOLLIN;
+  enread_ = true;
   loop_->update(this);
 }
 
 void Channel::disable_read() {
   if (events_ & EPOLLIN) {
     events_ &= ~EPOLLIN;
+    enread_ = false;
+    if (!enwrite_) {
+      close_ = true;
+    }
     loop_->update(this);
   }
 }
@@ -61,12 +68,17 @@ void Channel::enable_write() {
     return;
   }
   events_ |= EPOLLOUT;
+  enwrite_ = true;
   loop_->update(this);
 }
 
 void Channel::disable_write() {
   if (events_ & EPOLLOUT) {
     events_ &= ~EPOLLOUT;
+    enwrite_ = false;
+    if (!enread_) {
+      close_ = true;
+    }
     loop_->update(this);
   }
 }
@@ -87,9 +99,13 @@ void Channel::useET() {
   loop_->update(this);
 }
 
-bool Channel::is_inepoll() const { return inepoll_; }
+bool Channel::is_inloop() const { return inloop_; }
 
-void Channel::inepoll() { inepoll_ = true; }
+void Channel::inloop() { inloop_ = true; }
+
+bool Channel::enread() const { return enread_; }
+
+bool Channel::enwrite() const { return enwrite_; }
 
 int Channel::fd() const { return fd_; }
 

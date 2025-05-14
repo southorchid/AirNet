@@ -29,8 +29,12 @@ class Channel {
 
   void useET();
 
-  bool is_inepoll() const;
-  void inepoll();
+  bool is_inloop() const;
+  void inloop();
+
+  bool enread() const;
+
+  bool enwrite() const;
 
   int fd() const;
 
@@ -54,7 +58,9 @@ class Channel {
 
  private:
   std::shared_ptr<EventLoop> loop_;
-  bool inepoll_;
+  bool inloop_;
+  bool enread_;
+  bool enwrite_;
   int fd_;
   uint32_t events_;
   uint32_t reevents_;

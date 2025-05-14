@@ -1,47 +1,29 @@
 #include "EventLoop.h"
 
-EventLoop::EventLoop() : epoll_(std::make_unique<Epoll>()) {}
+#include <thread>
+
+#include "Log.h"
+
+EventLoop::EventLoop(Driver::MODEL model) : driver_(driver(model)) {}
 
 void EventLoop::run() {
+  Log::info("Reactor {} start", std::this_thread::get_id());
   while (true) {
-    auto channels = epoll_->wait();
-    for (auto ch : channels) {
-      int fd = ch->fd();
-      uint32_t reevents = ch->reevents();
-      if (reevents & EPOLLERR) {
-        ch->handle_disconnect();
-        break;
-      }
-      if (reevents & EPOLLHUP) {
-        ch->handle_disconnect();
-        break;
-      }
-      if (reevents & EPOLLPRI) {
-        ch->handle_read_event();
-        if (ch->is_close()) {
-          break;
-        }
-      }
-      if (reevents & EPOLLIN) {
-        ch->handle_read_event();
-        if (ch->is_close()) {
-          break;
-        }
-      }
-      if (reevents & EPOLLOUT) {
-        ch->handle_write_event();
-        if (ch->is_close()) {
-          break;
-        }
-      }
-      if (reevents & EPOLLRDHUP) {
-        ch->close_read();
-        break;
-      }
-    }
+    driver_->multiplexing();
   }
 }
 
-void EventLoop::update(Channel* ch) { epoll_->update(ch); }
+void EventLoop::update(Channel* ch) { driver_->update(ch); }
 
-void EventLoop::del(int fd) { epoll_->del(fd); }
+void EventLoop::del(int fd) { driver_->del(fd); }
+
+std::unique_ptr<Driver> EventLoop::driver(Driver::MODEL model) {
+  switch (model) {
+    case Driver::SELECT:
+      return std::make_unique<Select>();
+    case Driver::EPOLL:
+      return std::make_unique<Epoll>();
+    default:
+      return std::make_unique<Select>();
+  }
+}

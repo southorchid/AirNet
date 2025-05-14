@@ -10,7 +10,9 @@
 
 class Server {
  public:
-  Server(const std::string& host, int port, int reactor_count);
+  Server(const std::string& host, int port, Driver::MODEL model,
+         int reactor_count,
+         std::function<void(std::shared_ptr<Connection>)> func);
   Server(const Server&) = delete;
   Server& operator=(const Server&) = delete;
 
@@ -33,5 +35,6 @@ class Server {
   std::unique_ptr<Acceptor> acceptor_;
   std::unique_ptr<ThreadPool> thread_pool_;
   std::unordered_map<int, std::shared_ptr<Connection>> connections_;
+  std::mutex mutex_;
   std::function<void(std::shared_ptr<Connection>)> onconnect_callback_;
 };
