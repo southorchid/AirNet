@@ -6,13 +6,13 @@
 #include "Acceptor.h"
 #include "Connection.h"
 #include "EventLoop.h"
+#include "ThreadPool.h"
 
 class Server {
  public:
-  static Server& instance(
-      const std::string& host, int port,
-      std::function<void(std::shared_ptr<Connection>)> func);
-
+  Server(const std::string& host, int port, Driver::MODEL model,
+         int reactor_count,
+         std::function<void(std::shared_ptr<Connection>)> func);
   Server(const Server&) = delete;
   Server& operator=(const Server&) = delete;
 
@@ -22,8 +22,6 @@ class Server {
       std::function<void(std::shared_ptr<Connection>)> func);
 
  private:
-  Server(const std::string& host, int port);
-
   void newconnect(int fd, std::unique_ptr<InetAddress> address);
 
   void disconnect(int fd);
@@ -31,8 +29,12 @@ class Server {
  private:
   std::string host_;
   int port_;
-  std::shared_ptr<EventLoop> loop_;
+  int reactor_count_;
+  std::shared_ptr<EventLoop> main_reactor_;
+  std::vector<std::shared_ptr<EventLoop>> sub_reactor_;
   std::unique_ptr<Acceptor> acceptor_;
+  std::unique_ptr<ThreadPool> thread_pool_;
   std::unordered_map<int, std::shared_ptr<Connection>> connections_;
+  std::mutex mutex_;
   std::function<void(std::shared_ptr<Connection>)> onconnect_callback_;
 };

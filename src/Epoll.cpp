@@ -1,10 +1,62 @@
 #include "Epoll.h"
 
+#include <thread>
+
 Epoll::Epoll() : epfd_(-1), events_{} {
   epfd_ = epoll_create(EPOLL_CLOEXEC);
   if (epfd_ == -1) {
     Log::fatal("Epoll create failed: {}", strerror(errno));
     throw std::runtime_error("Epoll create failed");
+  }
+}
+
+void Epoll::multiplexing(int timeout) {
+  auto channels = this->wait();
+  for (auto ch : channels) {
+    int fd = ch->fd();
+    uint32_t reevents = ch->reevents();
+    if (reevents & EPOLLERR) {
+      Log::info("Connection {} disconnect: {}", fd, "EPOLLERR");
+      ch->handle_disconnect();
+      break;
+    }
+    if (reevents & EPOLLHUP) {
+      Log::info("Connection {} disconnect: {}", fd, "EPOLLHUP");
+      ch->handle_disconnect();
+      break;
+    }
+    if (reevents & EPOLLPRI) {
+      ch->handle_read_event();
+      if (ch->is_close()) {
+        Log::info("Connection {} disconnect: {}", fd, "EPOLLPRI");
+        ch->handle_disconnect();
+        break;
+      }
+    }
+    if (reevents & EPOLLIN) {
+      ch->handle_read_event();
+      if (ch->is_close()) {
+        Log::info("Connection {} disconnect: {}", fd, "EPOLLIN");
+        ch->handle_disconnect();
+        break;
+      }
+    }
+    if (reevents & EPOLLOUT) {
+      ch->handle_write_event();
+      if (ch->is_close()) {
+        Log::info("Connection {} disconnect: {}", fd, "EPOLLOUT");
+        ch->handle_disconnect();
+        break;
+      }
+    }
+    if (reevents & EPOLLRDHUP) {
+      ch->close_read();
+      if (ch->is_close()) {
+        Log::info("Connection {} disconnect: {}", fd, "EPOLLRDHUP");
+        ch->handle_disconnect();
+        break;
+      }
+    }
   }
 }
 
@@ -30,7 +82,7 @@ std::vector<Channel *> Epoll::wait(int timeout) {
 }
 
 void Epoll::update(Channel *ch) {
-  if (ch->is_inepoll()) {
+  if (ch->is_inloop()) {
     // Channel已经在epoll红黑树上
     this->mod(ch);
   } else {
@@ -38,7 +90,7 @@ void Epoll::update(Channel *ch) {
   }
 }
 
-void Epoll::del(int fd) const {
+void Epoll::del(int fd) {
   if (epoll_ctl(epfd_, EPOLL_CTL_DEL, fd, nullptr) == -1) {
     Log::error("Epoll ctl del {} failed: {}", fd, strerror(errno));
   }
@@ -56,7 +108,8 @@ void Epoll::add(Channel *ch) const {
   if (epoll_ctl(epfd_, EPOLL_CTL_ADD, fd, &ev) == -1) {
     Log::error("Epoll ctl add {} failed: {}", fd, strerror(errno));
   }
-  ch->inepoll();
+  // Log::info("Add channel {} to reactor {}", fd, std::this_thread::get_id());
+  ch->inloop();
 }
 
 void Epoll::mod(Channel *ch) const {

@@ -1,6 +1,6 @@
 #include "Acceptor.h"
 
-Acceptor::Acceptor(EventLoop* loop)
+Acceptor::Acceptor(std::shared_ptr<EventLoop> loop)
     : loop_(loop),
       socket_(std::make_unique<Socket>()),
       address_(nullptr),

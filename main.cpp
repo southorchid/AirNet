@@ -1,27 +1,10 @@
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
-#include <cstring>
-#include <iostream>
-#include <memory>
-#include <unordered_map>
-
-#include "Acceptor.h"
-#include "Channel.h"
-#include "Connection.h"
-#include "Epoll.h"
-#include "InetAddress.h"
 #include "Server.h"
-#include "Socket.h"
 
 void onconnect(std::shared_ptr<Connection> conn);
 
 int main() {
-  Server::instance("0.0.0.0", 8080, onconnect).run();
-
+  Server server("0.0.0.0", 8080, Driver::SELECT, 1, onconnect);
+  server.run();
   return 0;
 }
 

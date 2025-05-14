@@ -3,13 +3,14 @@
 #include <memory>
 
 #include "Channel.h"
+#include "Driver.h"
 #include "Epoll.h"
+#include "Select.h"
 
 class Channel;
-class Epoll;
 class EventLoop {
  public:
-  EventLoop();
+  explicit EventLoop(Driver::MODEL model);
   void run();
 
   EventLoop(const EventLoop&) = delete;
@@ -19,6 +20,8 @@ class EventLoop {
 
   void del(int fd);
 
+  std::unique_ptr<Driver> driver(Driver::MODEL model);
+
  private:
-  std::unique_ptr<Epoll> epoll_;
+  std::unique_ptr<Driver> driver_;
 };
