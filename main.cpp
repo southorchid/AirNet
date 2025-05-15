@@ -3,7 +3,7 @@
 void onconnect(std::shared_ptr<Connection> conn);
 
 int main() {
-  Server server("0.0.0.0", 8080, Driver::SELECT, 1, onconnect);
+  Server server("0.0.0.0", 8080, Driver::POLL, 1, onconnect);
   server.run();
   return 0;
 }

@@ -56,13 +56,13 @@ void Select::update(Channel* ch) {
     Log::error("Bad file descriptor");
     return;
   }
-
-  if (FD_ISSET(fd, &exceptfds_) == 0) {
+  if (!ch->is_inloop()) {
     FD_SET(fd, &exceptfds_);
     channels_[fd] = ch;
     if (fd > maxfd_) {
       maxfd_ = fd;
     }
+    ch->inloop();
   }
 
   // 对端关闭了写端，但不能将对端的fd从readfds_中移除，因为移除后就不能监视到对端断开连接的事件

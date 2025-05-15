@@ -16,19 +16,19 @@ class Epoll : public Driver {
 
   void multiplexing(int timeout = -1) override;
 
-  void update(Channel *ch) override;
+  void update(Channel* ch) override;
 
   void del(int fd) override;
 
  private:
-  std::vector<Channel *> wait(int timeout = -1);
+  std::vector<Channel*> wait(int timeout = -1);
 
-  void add(Channel *ch) const;
+  void add(Channel* ch) const;
 
-  void mod(Channel *ch) const;
+  void mod(Channel* ch) const;
 
  private:
   static constexpr int EVENTS_MAX_SIZE = 1024;
   int epfd_;
-  epoll_event events_[EVENTS_MAX_SIZE];
+  struct epoll_event events_[EVENTS_MAX_SIZE];
 };
