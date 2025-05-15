@@ -21,6 +21,8 @@ std::unique_ptr<Driver> EventLoop::driver(Driver::MODEL model) {
   switch (model) {
     case Driver::SELECT:
       return std::make_unique<Select>();
+    case Driver::POLL:
+      return std::make_unique<Poll>();
     case Driver::EPOLL:
       return std::make_unique<Epoll>();
     default:

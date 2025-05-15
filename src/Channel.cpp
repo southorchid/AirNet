@@ -7,7 +7,7 @@ Channel::Channel(std::shared_ptr<EventLoop> loop, int fd)
       enwrite_(false),
       fd_(fd),
       events_(0),
-      reevents_(0),
+      revents_(0),
       close_(false) {}
 
 void Channel::handle_read_event() {
@@ -111,13 +111,13 @@ int Channel::fd() const { return fd_; }
 
 uint32_t Channel::events() const { return events_; }
 
-uint32_t Channel::reevents() const { return reevents_; }
+uint32_t Channel::revents() const { return revents_; }
 
 bool Channel::is_close() const { return close_; }
 
 void Channel::close() { close_ = true; }
 
-void Channel::reevents(uint32_t ev) { reevents_ = ev; }
+void Channel::revents(uint32_t ev) { revents_ = ev; }
 
 void Channel::read_event_callback(std::function<void()> function) {
   read_event_callback_ = function;

@@ -40,8 +40,8 @@ class Channel {
 
   uint32_t events() const;
 
-  uint32_t reevents() const;
-  void reevents(uint32_t ev);
+  uint32_t revents() const;
+  void revents(uint32_t ev);
 
   bool is_close() const;
   void close();
@@ -63,7 +63,7 @@ class Channel {
   bool enwrite_;
   int fd_;
   uint32_t events_;
-  uint32_t reevents_;
+  uint32_t revents_;
   bool close_;
   std::function<void()> read_event_callback_;
   std::function<void()> write_event_callback_;
